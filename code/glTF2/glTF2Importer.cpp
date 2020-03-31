@@ -1175,8 +1175,39 @@ void glTF2Importer::ImportAnimations(glTF2::Asset& r)
                 maxNumberOfKeys = std::max(maxNumberOfKeys, chan->mNumScalingKeys);
             }
         }
-        ai_anim->mDuration = maxDuration;
-        ai_anim->mTicksPerSecond = (maxNumberOfKeys > 0 && maxDuration > 0) ? (maxNumberOfKeys / (maxDuration/1000)) : 30;
+
+
+        const double tickCount = (maxNumberOfKeys > 0) ? maxNumberOfKeys - 1 : 0;
+
+        // Note: mDuration should contain the total number of ticks!
+        ai_anim->mDuration = tickCount;
+        ai_anim->mTicksPerSecond = (tickCount > 0 && maxDuration > 0) ? tickCount * 1000.0 / maxDuration : 0.0;
+
+
+        // Post-Process mTime
+        // mTime member of the keys has to contain the frame index and not the time measured in ticks (at least other assimp importers (e.g. md5) do it like this).
+        const float tick = tickCount > 0 ? maxDuration / tickCount : 0.0f;
+        for (unsigned int j = 0; j < ai_anim->mNumChannels; ++j) {
+            auto* chan = ai_anim->mChannels[j];
+
+            for (unsigned k = 0; k < chan->mNumPositionKeys; ++k) {
+                // rounding for numeric stability; resulting time should be an integer 
+                chan->mPositionKeys[k].mTime = std::round(chan->mPositionKeys[k].mTime / tick);
+            }
+
+            for (unsigned k = 0; k < chan->mNumRotationKeys; ++k) {
+                // rounding for numeric stability; resulting time should be an integer 
+                chan->mRotationKeys[k].mTime = std::round(chan->mRotationKeys[k].mTime / tick);
+            }
+
+            for (unsigned k = 0; k < chan->mNumScalingKeys; ++k) {
+                // rounding for numeric stability; resulting time should be an integer 
+                chan->mScalingKeys[k].mTime = std::round(chan->mScalingKeys[k].mTime / tick);
+            }
+        }
+
+
+
 
         mScene->mAnimations[i] = ai_anim;
     }
